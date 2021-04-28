@@ -2,58 +2,33 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
 
+	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 )
-
-type UsersContainer struct {
-	Users []User `json:"users"`
-}
 
 type User struct {
 	ID   int
 	Name string
 }
 
-//func Get(w http.ResponseWriter, r *http.Request) {
-//	var users UsersContainer
-//	jsonFile, err := os.Open("data.json")
-//	if err != nil {
-//		panic(err)
-//	}
-//	defer jsonFile.Close()
-//	byteValue, _ := ioutil.ReadAll(jsonFile)
-//
-//	if err := json.Unmarshal(byteValue, &users); err != nil {
-//		// TODO: handle error
-//	}
-//	if err != nil {
-//		// TODO: handle error
-//	}
-//
-//	result := users
-//	if err := json.NewEncoder(w).Encode(result); err != nil {
-//		// TODO: handle error
-//	}
-//}
+type Repo struct {
+	conn *sql.DB
+}
 
-func main() {
-	connStr := "user=uraulasevic password=postgres dbname=gotest sslmode=disable"
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		fmt.Println(err)
-	}
+func (repo *Repo) Get(w http.ResponseWriter, r *http.Request) {
+	var users []User
 
-	defer db.Close()
-
-	rows, err := db.Query("select * from users")
+	rows, err := repo.conn.Query("select * from users")
 	if err != nil {
 		panic(err)
 	}
 
 	defer rows.Close()
-	var users []User
 
 	for rows.Next() {
 		var u User
@@ -65,19 +40,33 @@ func main() {
 		users = append(users, u)
 	}
 
-	for _, u := range users {
-		fmt.Println(u.ID, u.Name)
+	result := users
+
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		//	TODO: handle error
+	}
+}
+
+func main() {
+	connStr := "user=uraulasevic password=postgres dbname=gotest sslmode=disable"
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		fmt.Println(err)
 	}
 
-	//	router := mux.NewRouter()
-	//	router.HandleFunc("/users", Get).
-	//		Methods("GET")
-	//	router.HandleFunc("/user/new", Post).
-	//		Methods("POST")
-	//	routet.HandleFunc("user/update", Update).
-	//		Methods("PUT")
-	//	router.HandleFunc("user/{id}", Delete).
-	//		Methods("DELETE")
-	//	fmt.Println("starting server at :8080")
-	//	log.Fatal(http.ListenAndServe(":8080", router))
+	var repo Repo
+	repo.conn = db
+	defer repo.conn.Close()
+
+	router := mux.NewRouter()
+	router.HandleFunc("/users", repo.Get).
+		Methods("GET")
+		//	router.HandleFunc("/user/new", Post).
+		//		Methods("POST")
+		//	routet.HandleFunc("user/update", Update).
+		//		Methods("PUT")
+		//	router.HandleFunc("user/{id}", Delete).
+		//		Methods("DELETE")
+	fmt.Println("starting server at :8080")
+	log.Fatal(http.ListenAndServe(":8080", router))
 }
